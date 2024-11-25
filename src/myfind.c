@@ -111,6 +111,7 @@ void init_data(struct data *d)
 
 int update_option(struct data *d, char *opt)
 {
+    // 启用深度优先搜索
     if (my_strcmp("-d", opt) == 0)
     {
         d->d_checked = 1;
