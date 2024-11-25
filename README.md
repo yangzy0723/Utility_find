@@ -59,7 +59,7 @@
     # 执行表达式
     ./myfind . -name '*.c*'    
     ./myfind include/ src/ 1>myfind.txt
-    
+    ./myfind -name '*.h' -exec cat {} \;
     # 清理
     make clean
     ```

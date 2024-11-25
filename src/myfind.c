@@ -139,18 +139,20 @@ void generate_nodes(struct data *d)
     struct stat sb;  // 用于保存文件信息
     struct stat sbl; // 用于保存符号链接信息
     mode_t types[2]; // 存储文件和符号链接的类型
-    int srl;         // lstat return value
-    int islnk;       // Used to avoid calling !S_ISLNK multiple time
+    int srl;         // 存储lstat()的返回值
+    int islnk;       // 存储该文件是否是符号链接
     for (size_t i = 0; i < d->nl_size; i++)
     {
-        srl = lstat(d->name_list[i], &sbl); // Info about link
+        // lstat系统调用：lstat会获取符号链接本身的状态信息，而不是符号链接指向的目标文件的信息
+        // stat系统调用：stat系统调用用于获取文件或目录的状态信息，如果该文件是一个符号链接，stat会返回符号链接所指向的目标文件的信息，而不是符号链接本身的信息
+        srl = lstat(d->name_list[i], &sbl);
         if (srl == -1)
         {
             fprintf(stderr, "\'%s\' : No such file or directory\n", d->name_list[i]);
             d->return_value = 1;
             continue;
         }
-        stat(d->name_list[i], &sb); // Info about file behind link
+        stat(d->name_list[i], &sb);
         islnk = S_ISLNK(sbl.st_mode);
         types[0] = sbl.st_mode;
         types[1] = sb.st_mode;
@@ -203,7 +205,8 @@ int create_c_list(struct data *d)
         else
         {
             size_t index = 1;
-            while (my_strcmp(";", d->e_list[index + i]) && my_strcmp("+", d->e_list[index + i])) // Need handle wrong commands
+            // Need handle wrong commands
+            while (my_strcmp(";", d->e_list[index + i]) && my_strcmp("+", d->e_list[index + i]))
             {
                 index++;
                 if (index >= d->el_size)
@@ -411,6 +414,7 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
             char **new_args = calloc(i + 1, sizeof(char *));
             for (size_t j = 0; j < i; j++)
                 if (brackets_finder(ast->c_list[0]->args[j]) == 0)
+                    // 进入该if，保证已经存在一对紧密相连的大括号{}
                     new_args[j] = replace_echo(ast->c_list[0]->args[j], n->name);
                 else
                     new_args[j] = my_strcp(ast->c_list[0]->args[j]);
@@ -580,7 +584,7 @@ void parse_dir(char *name, struct data *d)
             parse_dir(new_name, d);
         }
     }
-    free(di);
+    closedir(di);
 }
 
 int find_close(struct ast *ast, int i)
@@ -631,16 +635,15 @@ char *replace_echo(char *str, char *name)
 {
     size_t str_s = my_strlen(str);
     size_t name_s = my_strlen(name);
-    char *new_str = calloc(str_s + name_s + 1, sizeof(char));
-    size_t i = 0;
     size_t index = 0;
-    while (str[i])
+    char *new_str = calloc(str_s + name_s + 1, sizeof(char));
+    for (int i = 0; i < str_s; i++)
     {
-        if (str[i] == '{' && str + 1 && str[i + 1] == '}')
+        if (i < str_s - 1 && str[i] == '{' && str[i + 1] == '}')
         {
-            for (size_t j = 0; j < name_s; j++)
+            for (int j = 0; j < name_s; j++)
             {
-                new_str[i + j] = name[j];
+                new_str[index] = name[j];
                 index++;
             }
             i++;
@@ -650,7 +653,6 @@ char *replace_echo(char *str, char *name)
             new_str[index] = str[i];
             index++;
         }
-        i++;
     }
     return new_str;
 }
