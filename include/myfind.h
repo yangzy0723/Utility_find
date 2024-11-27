@@ -13,10 +13,10 @@
  */
 struct node
 {
-    char *name;       /**< 节点的完整路径名，包括路径和文件名。 */
-    char *name_wp;    /**< 节点的文件名，不含路径部分（name without path）。 */
-    mode_t type;      /**< 节点的链接类型，来自 `lstat` 系统调用的结果。 */
-    mode_t r_type;    /**< 节点的实际类型，来自 `stat` 系统调用的结果。 */
+    char *name;    /**< 节点的完整路径名，包括路径和文件名。 */
+    char *name_wp; /**< 节点的文件名，不含路径部分（name without path）。 */
+    mode_t type;   /**< 节点的链接类型，来自 `lstat` 系统调用的结果。 */
+    mode_t r_type; /**< 节点的实际类型，来自 `stat` 系统调用的结果。 */
 };
 
 /**
@@ -27,17 +27,17 @@ struct node
  */
 enum enum_type
 {
-    THEN = 0,       /**< 表示 "THEN" 操作，逻辑上的 "然后"。 */
-    AND,            /**< 表示 "AND" 操作，逻辑上的 "与"。 */
-    OR,             /**< 表示 "OR" 操作，逻辑上的 "或"。 */
-    NO,             /**< 表示 "NO" 操作，逻辑上的 "非"（否定）。 */
-    PRINT,          /**< 表示打印操作。 */
-    CONDITION,      /**< 表示一个条件操作。 */
-    EXEC,           /**< 表示执行操作（普通执行）。 */
-    EXECP,          /**< 表示执行操作（带有额外参数）。 */
-    PAO,            /**< 表示左括号 "("（parenthesis open）。 */
-    PAC,            /**< 表示右括号 ")"（parenthesis close）。 */
-    FAPA            /**< 表示因式分解括号（factorized parenthesis）。 */
+    THEN = 0,  /**< 表示 "THEN" 操作，逻辑上的 "然后"。 */
+    AND,       /**< 表示 "AND" 操作，逻辑上的 "与"。 */
+    OR,        /**< 表示 "OR" 操作，逻辑上的 "或"。 */
+    NO,        /**< 表示 "NO" 操作，逻辑上的 "非"（否定）。 */
+    PRINT,     /**< 表示打印操作。 */
+    CONDITION, /**< 表示一个条件操作。 */
+    EXEC,      /**< 表示执行操作（普通执行）。 */
+    EXECP,     /**< 表示执行操作（带有额外参数）。 */
+    PAO,       /**< 表示左括号 "("（parenthesis open）。 */
+    PAC,       /**< 表示右括号 ")"（parenthesis close）。 */
+    FAPA       /**< 表示因式分解括号（factorized parenthesis）。 */
 };
 
 /**
@@ -67,9 +67,9 @@ struct ast
     struct ast *right;        /**< 指向右子节点的指针，表示树的右侧操作或表达式。 */
     enum enum_type et;        /**< 当前节点的操作类型，表示该节点的操作（如 AND、OR、THEN 等）。 */
     int rvalue[2];            /**< `rvalue` 数组，存储左右子节点的返回值：
-                                 * - `rvalue[0]`: 左子节点的返回值。
-                                 * - `rvalue[1]`: 右子节点的返回值。
-                                 */
+                               * - `rvalue[0]`: 左子节点的返回值。
+                               * - `rvalue[1]`: 右子节点的返回值。
+                               */
     struct compound **c_list; /**< 指向复合命令列表的指针数组。 */
     size_t cl_size;           /**< `c_list` 的大小，表示命令列表的元素数量。 */
 };
@@ -82,43 +82,43 @@ struct ast
  */
 struct data
 {
-    int return_value;       /**< 存储程序的返回值（例如命令执行后的退出状态）。 */
-    int d_checked;          /**< 标记是否开启-d选项。 */
-    int option;             /**< 存储命令行选项：
-                              * - 0: -P 默认行为，不跟随符号链接，仅处理符号链接本身
-                              * - 1: -H 命令行中明确指定的符号链接会被跟踪到它们指向的文件或目录
-                              * - 2: -L 无论是命令行中指定的符号链接，还是在遍历目录时遇到的符号链接，都会被跟踪 */
-    
+    int return_value; /**< 存储程序的返回值（例如命令执行后的退出状态）。 */
+    int d_checked;    /**< 标记是否开启-d选项。 */
+    int option;       /**< 存储命令行选项：
+                       * - 0: -P 默认行为，不跟随符号链接，仅处理符号链接本身
+                       * - 1: -H 命令行中明确指定的符号链接会被跟踪到它们指向的文件或目录
+                       * - 2: -L 无论是命令行中指定的符号链接，还是在遍历目录时遇到的符号链接，都会被跟踪 */
+
     // 查找路径列表
-    char **name_list;       /**< 存储命令行中输入的查找路径，通常用于目录、文件等的路径。 */
-    size_t nl_size;         /**< `name_list` 中元素的当前数量。 */
-    size_t nl_capacity;     /**< `name_list` 当前分配的容量，表示最多能容纳多少元素。 */
-    
+    char **search_path_list; /**< 存储命令行中输入的查找路径，通常用于目录、文件等的路径。 */
+    size_t spl_size;         /**< `search_path_list` 中元素的当前数量。 */
+    size_t spl_capacity;     /**< `search_path_list` 当前分配的容量，表示最多能容纳多少元素。 */
+
     // 表达式列表
-    char **e_list;          /**< 存储表达式的列表，例如逻辑表达式等。 */
-    size_t el_size;         /**< `e_list` 中元素的当前数量。 */
-    size_t el_capacity;     /**< `e_list` 当前分配的容量，表示最多能容纳多少表达式。 */
-    
+    char **exp_list;    /**< 存储表达式的列表，例如逻辑表达式等。 */
+    size_t el_size;     /**< `e_list` 中元素的当前数量。 */
+    size_t el_capacity; /**< `e_list` 当前分配的容量，表示最多能容纳多少表达式。 */
+
     // 节点列表
-    struct node **nodes;    /**< 存储节点列表，表示各个文件、目录或符号链接。 */
-    size_t no_size;         /**< `nodes` 中元素的当前数量。 */
-    size_t no_capacity;     /**< `nodes` 当前分配的容量，表示最多能容纳多少节点。 */
-    
+    struct node **nodes; /**< 存储节点列表，表示各个文件、目录或符号链接。 */
+    size_t no_size;      /**< `nodes` 中元素的当前数量。 */
+    size_t no_capacity;  /**< `nodes` 当前分配的容量，表示最多能容纳多少节点。 */
+
     // 存储已访问目录的 inode 列表，避免无限循环
-    int *inode_list;        /**< 存储已访问目录的 inode 列表，用于避免无限循环遍历。 */
-    size_t il_size;         /**< `inode_list` 中元素的当前数量。 */
-    size_t il_capacity;     /**< `inode_list` 当前分配的容量，表示最多能容纳多少 inode。 */
-    
+    int *inode_list;    /**< 存储已访问目录的 inode 列表，用于避免无限循环遍历。 */
+    size_t il_size;     /**< `inode_list` 中元素的当前数量。 */
+    size_t il_capacity; /**< `inode_list` 当前分配的容量，表示最多能容纳多少 inode。 */
+
     // 存储复合命令列表（如因式分解的表达式）
     struct compound **c_list; /**< 存储因式分解的表达式列表，在构建 AST 前使用。 */
-    size_t cl_size;         /**< `c_list` 中元素的当前数量。 */
-    size_t cl_capacity;     /**< `c_list` 当前分配的容量，表示最多能容纳多少复合命令。 */
-    
+    size_t cl_size;           /**< `c_list` 中元素的当前数量。 */
+    size_t cl_capacity;       /**< `c_list` 当前分配的容量，表示最多能容纳多少复合命令。 */
+
     // 抽象语法树（AST）
-    struct ast *ast;        /**< 存储抽象语法树，用于表示命令或表达式的树状结构。 */
-    
+    struct ast *ast; /**< 存储抽象语法树，用于表示命令或表达式的树状结构。 */
+
     // 动作标记
-    int actions;            /**< 如果 AST 中包含动作（如打印、执行），则为 1；否则为 0。 */
+    int actions; /**< 如果 AST 中包含动作（如执行），则为 1；否则为 0。 */
 };
 
 /**
@@ -151,12 +151,12 @@ int update_option(struct data *d, char *opt);
 /**
  * @brief 生成节点并递归解析目录
  *
- * 该函数遍历 `name_list` 中的所有文件或目录，并根据文件信息生成节点。如果文件是符号链接，
+ * 该函数遍历 `search_path_list` 中的所有文件或目录，并根据文件信息生成节点。如果文件是符号链接，
  * 会获取符号链接和目标文件的状态信息。如果文件是目录并且符号链接没有循环或符合特定选项，
  * 则递归调用 `parse_dir` 来遍历子目录。对于每个文件或目录，都会调用 `add_node` 来将其信息
  * 添加到数据结构中。函数还会确保不重复解析相同的 inode。
  *
- * @param d 指向 `struct data` 的指针，包含 `name_list` 数组和相关容量信息。
+ * @param d 指向 `struct data` 的指针，包含 `search_path_list` 数组和相关容量信息。
  */
 void generate_nodes(struct data *d);
 
@@ -210,8 +210,8 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child);
  *
  * @param d 指向 `struct data` 的指针，包含需要扩展的数组。
  * @param id 标识需要扩展的数组。不同的 `id` 对应不同的数组：
- *          - id = 0 扩展 `name_list` 数组
- *          - id = 1 扩展 `e_list` 数组
+ *          - id = 0 扩展 `search_path_list` 数组
+ *          - id = 1 扩展 `exp_list` 数组
  *          - id = 2 扩展 `nodes` 数组
  *          - id = 3 扩展 `inode_list` 数组
  *          - id = 4 扩展 `c_list` 数组
@@ -219,24 +219,24 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child);
 void my_realloc(struct data *d, int id);
 
 /**
- * @brief 将搜索路径名称添加到 `d->name_list` 数组
+ * @brief 将搜索路径名称添加到 `d->search_path_list` 数组
  *
- * 该函数用于将给定的名称 `name` 添加到 `struct data` 中的 `name_list` 数组。
+ * 该函数用于将给定的名称 `name` 添加到 `struct data` 中的 `search_path_list` 数组。
  * 如果当前数组容量已满，函数将调用 `my_realloc` 扩展数组容量，并继续将名称添加到数组。
  *
- * @param d 指向 `struct data` 的指针，包含 `name_list` 数组和相关的容量信息（`nl_size` 和 `nl_capacity`）。
- * @param name 要添加到 `name_list` 数组中的名称字符串。此名称将被复制并存储在数组中。
+ * @param d 指向 `struct data` 的指针，包含 `search_path_list` 数组和相关的容量信息（`spl_size` 和 `spl_capacity`）。
+ * @param name 要添加到 `search_path_list` 数组中的名称字符串。此名称将被复制并存储在数组中。
  */
 void add_search_path(struct data *d, char *name);
 
 /**
- * @brief 将表达式添加到 `d->e_list` 数组
+ * @brief 将表达式添加到 `d->exp_list` 数组
  *
- * 该函数用于将传入的表达式 `exp` 添加到 `struct data` 中的 `e_list` 数组。
+ * 该函数用于将传入的表达式 `exp` 添加到 `struct data` 中的 `exp_list` 数组。
  * 如果当前数组的容量已满，函数会调用 `my_realloc` 来扩展数组容量，并继续将表达式添加到数组中。
  *
- * @param d 指向 `struct data` 的指针，其中包含 `e_list` 数组和相关容量信息（`el_size` 和 `el_capacity`）。
- * @param exp 要添加到 `e_list` 数组的表达式字符串。
+ * @param d 指向 `struct data` 的指针，其中包含 `exp_list` 数组和相关容量信息（`el_size` 和 `el_capacity`）。
+ * @param exp 要添加到 `exp_list` 数组的表达式字符串。
  */
 void add_exp(struct data *d, char *exp);
 
@@ -279,14 +279,14 @@ int inode_exists(int ino, struct data *d);
 void add_node(char *name, char *name_wp, mode_t type, mode_t r_type, struct data *d);
 
 /**
- * @brief 将一个新的复合命令（compound）添加到 data 结构体中的 c_list（复合命令列表）。
+ * @brief 将一个新的复合表达式（compound）添加到 data 结构体中的 c_list（复合表达式列表）。
  *
- * 该函数创建一个新的复合命令，将其添加到 `data` 结构体中的 `c_list`（复合命令列表）。首先，函数会分配内存并初始化复合命令结构体，设置命令的名称、参数和命令类型。接着，如果 `c_list` 的当前容量不足以容纳新的命令，则会调用 `my_realloc` 函数重新分配内存。
+ * 该函数创建一个新的复合表达式，将其添加到 `data` 结构体中的 `c_list`（复合表达式列表）。首先，函数会分配内存并初始化复合表达式结构体，设置命令的名称、参数和命令类型。接着，如果 `c_list` 的当前容量不足以容纳新的命令，则会调用 `my_realloc` 函数重新分配内存。
  *
  * @param d 指向 `data` 结构体的指针，包含复合命令列表（c_list）。
- * @param name 新复合命令的名称。
- * @param args 新复合命令的参数数组。
- * @param et 新复合命令的类型（枚举类型 `enum_type`）。
+ * @param name 新复合表达式的名称。
+ * @param args 新复合表达式参数数组。
+ * @param et 新复合表达式的类型（枚举类型 `enum_type`）。
  */
 void add_compound(struct data *d, char *name, char **args, enum enum_type et);
 

@@ -29,10 +29,10 @@ int main(int argc, char *argv[])
     for (; index < argc && argv[index][0] != '-' && argv[index][0] != '(' && argv[index][0] != '!'; index++)
         add_search_path(&d, argv[index]);
     // 如果查找路径未指出，查找当前目录
-    if (d.nl_size == 0)
+    if (d.spl_size == 0)
     {
-        d.nl_size = 1;
-        d.name_list[0] = my_strcp(".");
+        d.spl_size = 1;
+        d.search_path_list[0] = my_strcp(".");
     }
     // 解析表达式
     for (; index < argc; index++)
@@ -82,16 +82,16 @@ void init_data(struct data *d)
     d->option = 0;
     d->return_value = 0;
     d->d_checked = 0;
-    d->nl_size = 0;
+    d->spl_size = 0;
     d->el_size = 0;
     d->no_size = 0;
     d->il_size = 0;
-    d->name_list = calloc(10, sizeof(char *));
-    d->e_list = calloc(10, sizeof(char *));
+    d->search_path_list = calloc(10, sizeof(char *));
+    d->exp_list = calloc(10, sizeof(char *));
     d->nodes = calloc(10, sizeof(struct node *));
     d->inode_list = calloc(10, sizeof(int));
     d->c_list = calloc(10, sizeof(struct compound *));
-    d->nl_capacity = 10;
+    d->spl_capacity = 10;
     d->el_capacity = 10;
     d->no_capacity = 10;
     d->il_capacity = 10;
@@ -136,18 +136,18 @@ void generate_nodes(struct data *d)
     mode_t types[2]; // 存储文件和符号链接的类型
     int srl;         // 存储lstat()的返回值
     int islnk;       // 存储该文件是否是符号链接
-    for (size_t i = 0; i < d->nl_size; i++)
+    for (size_t i = 0; i < d->spl_size; i++)
     {
         // lstat系统调用：lstat会获取符号链接本身的状态信息，而不是符号链接指向的目标文件的信息
         // stat系统调用：stat系统调用用于获取文件或目录的状态信息，如果该文件是一个符号链接，stat会返回符号链接所指向的目标文件的信息，而不是符号链接本身的信息
-        srl = lstat(d->name_list[i], &sbl);
+        srl = lstat(d->search_path_list[i], &sbl);
         if (srl == -1)
         {
-            fprintf(stderr, "\'%s\' : No such file or directory\n", d->name_list[i]);
+            fprintf(stderr, "\'%s\' : No such file or directory\n", d->search_path_list[i]);
             d->return_value = 1;
             continue;
         }
-        stat(d->name_list[i], &sb);
+        stat(d->search_path_list[i], &sb);
         islnk = S_ISLNK(sbl.st_mode);
         types[0] = sbl.st_mode;
         types[1] = sb.st_mode;
@@ -157,19 +157,19 @@ void generate_nodes(struct data *d)
             if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 1 || d->option == 2))
             {
                 add_inode(sb.st_ino, d);
-                parse_dir(d->name_list[i], d);
+                parse_dir(d->search_path_list[i], d);
             }
-            add_node(d->name_list[i], my_strcp(d->name_list[i]), types[0], types[1], d);
+            add_node(d->search_path_list[i], my_strcp(d->search_path_list[i]), types[0], types[1], d);
             free_il(d);
         }
         // 广度优先搜索
         else
         {
-            add_node(d->name_list[i], my_strcp(d->name_list[i]), types[0], types[1], d);
+            add_node(d->search_path_list[i], my_strcp(d->search_path_list[i]), types[0], types[1], d);
             if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 1 || d->option == 2))
             {
                 add_inode(sb.st_ino, d);
-                parse_dir(d->name_list[i], d);
+                parse_dir(d->search_path_list[i], d);
             }
             free_il(d);
         }
@@ -181,21 +181,21 @@ int create_c_list(struct data *d)
     char **args;
     for (size_t i = 0; i < d->el_size; i++)
     {
-        if (my_strcmp("-print", d->e_list[i]) == 0)
-            add_compound(d, d->e_list[i], NULL, PRINT);
-        else if (my_strcmp("-a", d->e_list[i]) == 0)
-            add_compound(d, d->e_list[i], NULL, AND);
-        else if (my_strcmp("-o", d->e_list[i]) == 0)
-            add_compound(d, d->e_list[i], NULL, OR);
-        else if (my_strcmp("!", d->e_list[i]) == 0)
-            add_compound(d, d->e_list[i], NULL, NO);
-        else if (my_strcmp("(", d->e_list[i]) == 0)
-            add_compound(d, d->e_list[i], NULL, PAO);
-        else if (my_strcmp(")", d->e_list[i]) == 0)
-            add_compound(d, d->e_list[i], NULL, PAC);
-        else if (my_strcmp("-type", d->e_list[i]) == 0 ||
-                 my_strcmp("-name", d->e_list[i]) == 0 ||
-                 my_strcmp("-perm", d->e_list[i]) == 0)
+        if (my_strcmp("-print", d->exp_list[i]) == 0)
+            add_compound(d, d->exp_list[i], NULL, PRINT);
+        else if (my_strcmp("-a", d->exp_list[i]) == 0)
+            add_compound(d, d->exp_list[i], NULL, AND);
+        else if (my_strcmp("-o", d->exp_list[i]) == 0)
+            add_compound(d, d->exp_list[i], NULL, OR);
+        else if (my_strcmp("!", d->exp_list[i]) == 0)
+            add_compound(d, d->exp_list[i], NULL, NO);
+        else if (my_strcmp("(", d->exp_list[i]) == 0)
+            add_compound(d, d->exp_list[i], NULL, PAO);
+        else if (my_strcmp(")", d->exp_list[i]) == 0)
+            add_compound(d, d->exp_list[i], NULL, PAC);
+        else if (my_strcmp("-type", d->exp_list[i]) == 0 ||
+                 my_strcmp("-name", d->exp_list[i]) == 0 ||
+                 my_strcmp("-perm", d->exp_list[i]) == 0)
         {
             if (i >= d->el_size - 1)
             {
@@ -204,15 +204,15 @@ int create_c_list(struct data *d)
                 return 1;
             }
             args = calloc(2, sizeof(char *));
-            args[0] = d->e_list[i + 1];
-            add_compound(d, d->e_list[i], args, CONDITION);
+            args[0] = d->exp_list[i + 1];
+            add_compound(d, d->exp_list[i], args, CONDITION);
             i++;
         }
         else
         {
             size_t index = 1;
             // Need handle wrong commands
-            while (my_strcmp(";", d->e_list[index + i]) && my_strcmp("+", d->e_list[index + i]))
+            while (my_strcmp(";", d->exp_list[index + i]) && my_strcmp("+", d->exp_list[index + i]))
             {
                 index++;
                 if (index >= d->el_size)
@@ -224,11 +224,11 @@ int create_c_list(struct data *d)
             }
             args = calloc(index, sizeof(char *));
             for (size_t j = 0; j < index - 1; j++)
-                args[j] = d->e_list[i + j + 1];
-            if (my_strcmp(";", d->e_list[index + i]))
-                add_compound(d, d->e_list[i], args, EXEC);
+                args[j] = d->exp_list[i + j + 1];
+            if (my_strcmp(";", d->exp_list[index + i]))
+                add_compound(d, d->exp_list[i], args, EXEC);
             else
-                add_compound(d, d->e_list[i], args, EXECP);
+                add_compound(d, d->exp_list[i], args, EXECP);
             i += index;
         }
         d->cl_size++;
@@ -451,13 +451,13 @@ void my_realloc(struct data *d, int id)
 {
     if (id == 0)
     {
-        d->nl_capacity *= 2;
-        d->name_list = realloc(d->name_list, d->nl_capacity * sizeof(char *));
+        d->spl_capacity *= 2;
+        d->search_path_list = realloc(d->search_path_list, d->spl_capacity * sizeof(char *));
     }
     else if (id == 1)
     {
         d->el_capacity *= 2;
-        d->e_list = realloc(d->e_list, d->el_capacity * sizeof(char *));
+        d->exp_list = realloc(d->exp_list, d->el_capacity * sizeof(char *));
     }
     else if (id == 2)
     {
@@ -478,10 +478,10 @@ void my_realloc(struct data *d, int id)
 
 void add_search_path(struct data *d, char *name)
 {
-    if (d->nl_size < d->nl_capacity)
+    if (d->spl_size < d->spl_capacity)
     {
-        d->name_list[d->nl_size] = my_strcp(name);
-        d->nl_size++;
+        d->search_path_list[d->spl_size] = my_strcp(name);
+        d->spl_size++;
     }
     else
     {
@@ -494,7 +494,7 @@ void add_exp(struct data *d, char *exp)
 {
     if (d->el_size < d->el_capacity)
     {
-        d->e_list[d->el_size] = exp;
+        d->exp_list[d->el_size] = exp;
         d->el_size++;
     }
     else
@@ -764,10 +764,10 @@ void free_data(struct data *d)
     }
     free(d->nodes);
     for (size_t i = 0; i < d->el_size; i++)
-        free(d->e_list[i]);
-    free(d->e_list);
+        free(d->exp_list[i]);
+    free(d->exp_list);
     free(d->inode_list);
-    free(d->name_list);
+    free(d->search_path_list);
     for (size_t i = 0; i < d->cl_size; i++)
     {
         free(d->c_list[i]->args);
