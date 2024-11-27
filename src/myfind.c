@@ -40,12 +40,6 @@ int main(int argc, char *argv[])
         char *exp = my_strcp(argv[index]);
         add_exp(&d, exp);
     }
-
-    generate_nodes(&d);
-    // 打开选项-d，myfind会在处理目录的内容之前先处理该目录本身，因此invert nodes_list
-    if (d.d_checked)
-        invert_node_list(&d);
-
     // 创建命令列表并检查错误
     if (create_c_list(&d))
     {
@@ -54,13 +48,12 @@ int main(int argc, char *argv[])
         free_data(&d);
         return rv;
     }
-
-    // 全力处理d.ast，抽象语法树
+    // 创建抽象语法树
     d.ast->c_list = d.c_list;
     d.ast->cl_size = d.cl_size;
     build_ast(d.ast);
     reset_rvalues(d.ast);
-
+    // 检查抽象语法树
     if (is_ast_valid(&d, NULL, d.ast, 0))
     {
         free(d.c_list);
@@ -68,21 +61,22 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Expressions error\n");
         return 1;
     }
-    for (int i = 0; i < d.no_size; i++)
-    {
-        if (d.ast->left)
-            exec_ast(d.ast, d.ast, d.nodes[i], 0);
-        if (!d.actions && d.ast->rvalue[0] == 1 && d.ast->rvalue[1] == 1)
-            printf("%s\n", d.nodes[i]->name);
-        reset_rvalues(d.ast);
-    }
+
+    generate_nodes(&d);
+    // for (int i = 0; i < d.no_size; i++)
+    // {
+    //     if (d.ast->left)
+    //         exec_ast(d.ast, d.ast, d.nodes[i], 0);
+    //     if (!d.actions && d.ast->rvalue[0] == 1 && d.ast->rvalue[1] == 1)
+    //         printf("%s\n", d.nodes[i]->name);
+    //     reset_rvalues(d.ast);
+    // }
 
     int rvalue = d.return_value;
     free_data(&d);
     return (rvalue);
 }
 
-// Inits data structure
 void init_data(struct data *d)
 {
     d->option = 0;
@@ -157,16 +151,27 @@ void generate_nodes(struct data *d)
         islnk = S_ISLNK(sbl.st_mode);
         types[0] = sbl.st_mode;
         types[1] = sb.st_mode;
-        add_node(d->name_list[i], my_strcp(d->name_list[i]), types[0], types[1], d);
-        if (!S_ISDIR(sb.st_mode))
-            continue;
-        // d->option == 1，-H：命令行中明确指定的符号链接会被跟踪到它们指向的文件或目录
-        // d->option == 2，-L：无论是命令行中指定的符号链接，还是在遍历目录时遇到的符号链接，都会被跟踪
-        else if (!islnk || d->option == 1 || d->option == 2)
+        // 深度优先搜索
+        if (d->d_checked)
         {
-            add_inode(sb.st_ino, d);
-            parse_dir(d->name_list[i], d);
-            free_il(d); // free inode list for next usage
+            if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 1 || d->option == 2))
+            {
+                add_inode(sb.st_ino, d);
+                parse_dir(d->name_list[i], d);
+            }
+            add_node(d->name_list[i], my_strcp(d->name_list[i]), types[0], types[1], d);
+            free_il(d);
+        }
+        // 广度优先搜索
+        else
+        {
+            add_node(d->name_list[i], my_strcp(d->name_list[i]), types[0], types[1], d);
+            if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 1 || d->option == 2))
+            {
+                add_inode(sb.st_ino, d);
+                parse_dir(d->name_list[i], d);
+            }
+            free_il(d);
         }
     }
 }
@@ -233,7 +238,6 @@ int create_c_list(struct data *d)
 
 void build_ast(struct ast *ast)
 {
-    // If no expression, build ast with -print
     if (!ast->cl_size)
         return;
     // Search first top level OR
@@ -534,6 +538,12 @@ void add_node(char *name, char *name_wp, mode_t type, mode_t r_type,
         my_realloc(d, 2);
     d->nodes[d->no_size] = n;
     d->no_size++;
+
+    if (d->ast->left)
+        exec_ast(d->ast, d->ast, n, 0);
+    if (!d->actions && d->ast->rvalue[0] == 1 && d->ast->rvalue[1] == 1)
+        printf("%s\n", n->name);
+    reset_rvalues(d->ast);
 }
 
 void add_compound(struct data *d, char *name, char **args, enum enum_type et)
@@ -566,23 +576,39 @@ void parse_dir(char *name, struct data *d)
         islnk = S_ISLNK(sbl.st_mode);
         types[0] = sbl.st_mode;
         types[1] = sb.st_mode;
-
-        add_node(new_name, my_strcp(dir->d_name), types[0], types[1], d);
-
-        // 如果不是目录，直接跳过
-        if (!S_ISDIR(sb.st_mode))
-            continue;
-        // 如果是目录，检查是否符号链接或选项允许递归解析
-        else if (!islnk || d->option == 2)
+        // 深度优先搜索
+        if (d->d_checked)
         {
-            // 检查是否已解析过该inode
-            if (inode_exists(sb.st_ino, d))
+            // 如果是目录，检查是否符号链接或选项允许递归解析
+            if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 2))
             {
-                d->return_value = 1;
-                continue;
+                // 检查是否已解析过该inode
+                if (inode_exists(sb.st_ino, d))
+                    d->return_value = 1;
+                else
+                {
+                    add_inode(sb.st_ino, d);
+                    parse_dir(new_name, d);
+                }
             }
-            add_inode(sb.st_ino, d);
-            parse_dir(new_name, d);
+            add_node(new_name, my_strcp(dir->d_name), types[0], types[1], d);
+        }
+        // 广度优先搜索
+        else
+        {
+            add_node(new_name, my_strcp(dir->d_name), types[0], types[1], d);
+            // 如果是目录，检查是否符号链接或选项允许递归解析
+            if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 2))
+            {
+                // 检查是否已解析过该inode
+                if (inode_exists(sb.st_ino, d))
+                    d->return_value = 1;
+                else
+                {
+                    add_inode(sb.st_ino, d);
+                    parse_dir(new_name, d);
+                }
+            }
         }
     }
     closedir(di);
@@ -694,19 +720,9 @@ int is_ast_valid(struct data *d, struct ast *parent, struct ast *ast, int child)
     default:
         break;
     }
-    if (!rvalue)
-        return is_ast_valid(d, ast, ast->left, 0) +
-               is_ast_valid(d, ast, ast->right, 1);
-    return 1;
-}
-
-void invert_node_list(struct data *d)
-{
-    struct node **new_nodes = calloc(d->no_capacity, sizeof(struct node *));
-    for (size_t i = 0; i < d->no_size; i++)
-        new_nodes[i] = d->nodes[d->no_size - i - 1];
-    free(d->nodes);
-    d->nodes = new_nodes;
+    if (rvalue)
+        return 1;
+    return is_ast_valid(d, ast, ast->left, 0) + is_ast_valid(d, ast, ast->right, 1);
 }
 
 void reset_rvalues(struct ast *root)

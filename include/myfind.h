@@ -140,7 +140,7 @@ void init_data(struct data *d);
  *
  * - 如果选项为 `-d`，将 `d->d_checked` 设置为 `1`。
  * - 如果选项为 `-P`、`-H` 或 `-L`，将 `d->option` 设置为不同的值。
- *
+ * - -H、-L 和 -P 同时指定，最后一个指定的选项生效。
  * @param d 要更新的 `struct data` 结构体。
  * @param opt 传入的选项字符串。
  *
@@ -161,14 +161,14 @@ int update_option(struct data *d, char *opt);
 void generate_nodes(struct data *d);
 
 /**
- * @brief 遍历表达式列表（e_list），并根据每个命令的类型创建相应的复合命令，将其添加到复合命令列表（c_list）中。
+ * @brief 遍历表达式列表（e_list），并根据每个表达式的类型创建相应的复合表达式，将其添加到复合表达式列表（c_list）中。
  *
  * 该函数会遍历 `data` 结构体中的表达式列表（`e_list`），
- * 根据每个表达式的类型（例如 `-print`, `-a`, `-type`, `-exec` 等），创建相应的复合命令，
- * 并将其添加到 `c_list` 中。支持的命令包括打印命令、逻辑操作符、括号、条件命令以及执行命令。
- * 如果某些命令语法不正确，函数会打印错误信息并返回错误代码 1。否则，返回 0。
+ * 根据每个表达式的类型（例如 `-print`, `-a`, `-type`, `-exec` 等），创建相应的复合表达式，
+ * 并将其添加到 `c_list` 中。支持的表达式包括打印、逻辑操作符、括号、条件表达式以及执行。
+ * 如果某些表达式语法不正确，函数会打印错误信息并返回错误代码 1。否则，返回 0。
  *
- * @param d 指向 `data` 结构体的指针，包含表达式列表（e_list）和复合命令列表（c_list）。
+ * @param d 指向 `data` 结构体的指针，包含表达式列表（e_list）和复合表达式列表（c_list）。
  *
  * @return 如果成功，返回 0；如果出现错误（例如无效的语法），返回 1。
  */
@@ -370,7 +370,7 @@ int brackets_finder(char *str);
  * @brief 验证抽象语法树（AST）的结构和逻辑。
  *
  * 该函数检查抽象语法树的有效性，通过检查每个节点的类型和结构，确保其符合预期的约束条件。
- * 该验证是递归进行的，若发现任何无效的节点，则返回0，若树有效则返回1。
+ * 该验证是递归进行的，若发现任何无效的节点，则返回非0，若树有效则返回0。
  *
  * - THEN节点如果存在，必须具有左子节点。
  * - AND和OR节点必须有左右两个子节点。
@@ -383,20 +383,9 @@ int brackets_finder(char *str);
  * @param ast 当前被验证的节点。
  * @param child 指示当前节点是父节点的左子节点（0）还是右子节点（1）的整数。
  *
- * @return 如果AST有效，返回1；如果无效，返回0。
+ * @return 如果AST有效，返回0；如果无效，返回非0。
  */
 int is_ast_valid(struct data *d, struct ast *parent, struct ast *ast, int child);
-
-/**
- * @brief 反转节点列表的顺序
- *
- * 该函数会将 `d->nodes` 数组中存储的节点顺序倒置。首先，创建一个新的节点数组 `new_nodes`，
- * 然后将原数组 `d->nodes` 中的节点逆序复制到新数组中。最后，释放旧的节点数组，并将 `d->nodes`
- * 指向新的倒序数组。
- *
- * @param d 指向 `struct data` 的指针，其中包含 `nodes` 数组和相关容量信息。
- */
-void invert_node_list(struct data *d);
 
 /**
  * @brief 重置抽象语法树（AST）中所有节点的rvalue值。
