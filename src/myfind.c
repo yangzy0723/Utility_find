@@ -225,7 +225,7 @@ int create_c_list(struct data *d)
             args = calloc(index, sizeof(char *));
             for (size_t j = 0; j < index - 1; j++)
                 args[j] = d->exp_list[i + j + 1];
-            if (my_strcmp(";", d->exp_list[index + i]))
+            if (my_strcmp(";", d->exp_list[index + i]) == 0)
                 add_compound(d, d->exp_list[i], args, EXEC);
             else
                 add_compound(d, d->exp_list[i], args, EXECP);
@@ -698,21 +698,20 @@ int is_ast_valid(struct data *d, struct ast *parent, struct ast *ast, int child)
 {
     if (!ast)
         return 0;
-    int rvalue = 0;
     switch (ast->et)
     {
     case THEN:
         if (!ast->left && parent)
-            rvalue = 1;
+            return 1;
         break;
     case AND:
     case OR:
         if (!(ast->left && ast->right))
-            rvalue = 1;
+            return 1;
         break;
     case NO:
         if (child || !parent->right)
-            rvalue = 1;
+            return 1;
         break;
     case PRINT:
     case EXEC:
@@ -720,8 +719,6 @@ int is_ast_valid(struct data *d, struct ast *parent, struct ast *ast, int child)
     default:
         break;
     }
-    if (rvalue)
-        return 1;
     return is_ast_valid(d, ast, ast->left, 0) + is_ast_valid(d, ast, ast->right, 1);
 }
 
