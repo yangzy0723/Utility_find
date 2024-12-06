@@ -42,6 +42,6 @@ chatbot.set_background_message(system_prompt)
 def agent_helper_dynamic(help_prompt : str) -> str:
     return chatbot.get_response(help_prompt)
 
-llm_ret = chatbot.get_response('Search ~ to find all the files. If the time exceeds 0.001 second, modify search_max_depth to -1')
+llm_ret = chatbot.get_response('Search ~ to find all the files. If the time exceeds 2 second, modify search_max_depth to 0')
 print("From LLM, code to be executed:\n  " + llm_ret)
 exec(llm_ret)
