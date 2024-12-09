@@ -1,21 +1,20 @@
+import multiprocessing
+
 from llm import Chatbot
 from utility_find import find
 
-chatbot = Chatbot(
-    api_key='sk-CyDXPaWtLzftviXwCQtZZAAYO4EuvhQQ4nzBzEwy8I7xIEvx',
-    base_url='https://api.chatanywhere.tech/v1',
-    model='gpt-4o-mini'
-)
+timeout = 10
+depth = 3
+name_pattern = "*mlsys*"
 
 system_prompt = '''
 This is how find work:
 def find(
     folders: List[str],
     follow_symlink_signal: int = 0,
-    process_dir_first: bool = False,
+    process_dir_first: bool = True,
     name: Optional[str] = None,
-    timeout: Optional[int] = None,
-    agent_helper: Optional[Callable[[str], None]] = None
+    search_depth: Optional[int] = None
 ) -> None:
 Parameters:
     - folders (List[str]):
@@ -29,26 +28,32 @@ Parameters:
         If True, directories will be processed first (printed before their contents). If False, directories will be processed after their contents (printed after traversal).
     - name (str, optional):
         The file need to be matched. Wildcard expressions can be used to satisfy fields.
-    - timeout (Optional[int], default None):
-        Specifies the number of seconds before a timeout occurs. If provided, a timer will be started, and a callback (via agent_helper) will be triggered if the timeout is reached.
-        
-    - agent_helper(Timeout Callback)
-        When a timeout occurs, you will be called again, at which point you need to modify certain values based on the user's intent, such as find_context.max_depth.
-    - agent_helper
-        MUST use exp: agent_helper=agent_helper_dynamic
-        
 You can use the find function to achieve the goal. No define, just use!
 Please only use python code to finish my request, no markdown, no other explanations!
 '''
-
+chatbot = Chatbot(
+    api_key='sk-CyDXPaWtLzftviXwCQtZZAAYO4EuvhQQ4nzBzEwy8I7xIEvx',
+    base_url='https://api.chatanywhere.tech/v1',
+    model='gpt-4o-mini'
+)
 chatbot.set_background_message(system_prompt)
-
-def agent_helper_dynamic(help_prompt : str) -> str:
-    return chatbot.get_response(help_prompt)
-
-llm_ret = chatbot.get_response('''
-Search ~ to find files with the "mlsys" field in their names.
+llm_ret = chatbot.get_response(f'''
+Search ~ to find files with the {name_pattern} field in their names.
 If the time exceeds 1 second, modify search_max_depth to 5.
 ''')
 print("From LLM, code to be executed:\n  " + llm_ret)
-exec(llm_ret)
+# exec (llm_ret)
+
+def target_find(_depth):
+    find(["~"], name = name_pattern, search_depth=_depth)
+
+def execute_with_timeout(_depth, _timeout):
+    process = multiprocessing.Process(target=target_find, args=(_depth if _depth is not None else -1,))
+    process.start()
+    if _timeout is not None:
+        process.join(_timeout)
+        if process.is_alive():
+            process.terminate()
+
+execute_with_timeout(_depth=None, _timeout=timeout)
+execute_with_timeout(_depth=depth, _timeout=None)

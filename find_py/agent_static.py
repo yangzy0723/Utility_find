@@ -12,9 +12,10 @@ This is how find work:
 def find(
     folders: List[str],
     follow_symlink_signal: int = 0,
-    process_dir_first: bool = True,
-    timeout: Optional[double] = None,
-    agent_helper: Optional[Callable[[str], str]] = None
+    process_dir_first: bool = False,
+    name: Optional[str] = None,
+    timeout: Optional[int] = None,
+    agent_helper: Optional[Callable[[str], None]] = None
 ) -> None:
 Parameters:
     folders (List[str]):
@@ -26,15 +27,18 @@ Parameters:
             2: Follow symlinks unconditionally, as specified by the command-line argument -L.
     process_dir_first (bool, default True):
         If True, directories will be processed first (printed before their contents). If False, directories will be processed after their contents (printed after traversal).
+    name (str, optional):
+        The file need to be matched. Wildcard expressions can be used to satisfy fields.
     timeout (Optional[int], default None):
-        Specifies the number of seconds before a timeout occurs. If provided, a timer will be started, and a callback (via llm_helper) will be triggered if the timeout is reached.
+        Specifies the number of seconds before a timeout occurs. If provided, a timer will be started, and a callback (via agent_helper) will be triggered if the timeout is reached.
 
-    Timeout Callback (llm_helper):
+    agent_helper(Timeout Callback):
         Task: When a timeout occurs, specific code needs to be executed. 
-            Please ** define ** the agent_helper_static function to achieve the request. For example, you may modify find_context.max_depth
-            Then, return the code as a string.
-    llm_helper
-        ** MUST use exp: agent_helper=agent_helper_static **
+            Please define the agent_helper_static function to achieve the request. For example, you may modify find_context.max_depth
+            Then, return the code as a ** string **.
+    agent_helper
+        MUST use exp: agent_helper=agent_helper_static
+        
 You need implement agent_helper_static in advance, it will be used later.
 You can use the find function to achieve the goal. No define, just use!
 Please only use python code to finish my request, no markdown, no other explanations!
@@ -42,6 +46,9 @@ Please only use python code to finish my request, no markdown, no other explanat
 
 chatbot.set_background_message(system_prompt)
 
-llm_ret = chatbot.get_response('Search ~ to find all the files. If the time exceeds 2 second, modify search_max_depth to 6')
+llm_ret = chatbot.get_response('''
+Search ~ to find files with the "mlsys" field in their names.
+If the time exceeds 1 second, modify search_max_depth to 5.
+''')
 print("From LLM, code to be executed:\n  " + llm_ret)
 exec(llm_ret)

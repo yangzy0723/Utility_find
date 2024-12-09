@@ -1,38 +1,47 @@
-import inspect
-import os
 import argparse
-import threading
-from typing import List, Optional, Callable
+import fnmatch
+import inspect
 import logging
+import os
+import threading
+
+from typing import Callable, List, Optional
 
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-OUTPUT_FILE = "res.txt"
-f = open(OUTPUT_FILE, "w")
-def abstract_output(message: str):
-    # f.write(message + '\n')
-    print(message)
-
+f = open("res.txt", "w")
 find_context = None
+
+def use_output_tool(message: str):
+    print(message)
+    # f.write(message + '\n')
+    find_context.has_result = True
 
 class FindContext:
     def __init__(self, max_depth: int = -1):
+        self.has_result = False
         self.max_depth = max_depth
         self.timeout_occurred = False
 
-    def handle_timeout(self, agent_helper: Optional[Callable[[Optional[str]], str]] = None):
+    def handle_timeout(self, agent_helper: Optional[Callable[[Optional[str]], str]]):
         self.timeout_occurred = True
-        if agent_helper is None:
-            logging.warning("Timeout occurred! No Agent Helper provided. Skipping.")
-        else:
-            if len(inspect.signature(agent_helper).parameters) > 0:
-                prompt = "A timeout event has occurred, please take appropriate action."
-                agent_ret = agent_helper(prompt)
+        if not self.has_result:
+            if agent_helper is None:
+                logging.warning('''
+                    Timeout occurred, no result...
+                    No Agent Helper provided.
+                    Skipping!
+                ''')
+                return
             else:
-                agent_ret = agent_helper()
-            print("From agent, code to be executed:\n  " + agent_ret)
-            global find_context
-            exec(agent_ret)
+                global find_context
+                if len(inspect.signature(agent_helper).parameters) > 0:
+                    prompt = "A timeout event has occurred, please take appropriate action."
+                    agent_ret = agent_helper(prompt)
+                else:
+                    agent_ret = agent_helper()
+                print("From agent, code to be executed:\n  " + agent_ret)
+                exec(agent_ret)
 
 
 def start_timer(timeout_seconds: int, callback: Callable):
@@ -45,7 +54,8 @@ def walk_dir(
         follow_symlink_flag: bool,
         process_dir_first: bool,
         depth: int,
-        context: FindContext
+        context: FindContext,
+        name_pattern: Optional[str] = None
 ):
     try:
         entries = os.listdir(directory)
@@ -54,46 +64,52 @@ def walk_dir(
         return
 
     if not process_dir_first:
-        abstract_output(directory)
+        if name_pattern is None or fnmatch.fnmatch(directory, name_pattern):
+            use_output_tool(directory)
 
     for entry in entries:
         entry_path = os.path.join(directory, entry)
         try:
             if os.path.islink(entry_path) and not follow_symlink_flag:
-                abstract_output(entry_path)
+                if name_pattern is None or fnmatch.fnmatch(entry, name_pattern):
+                    use_output_tool(entry_path)
                 continue
 
             if os.path.isdir(entry_path):
                 if context.max_depth < 0 or depth < context.max_depth:
                     walk_dir(
-                        directory = entry_path,
-                        follow_symlink_flag = follow_symlink_flag,
-                        process_dir_first = process_dir_first,
-                        depth = depth + 1,
-                        context = context)
+                        directory=entry_path,
+                        follow_symlink_flag=follow_symlink_flag,
+                        process_dir_first=process_dir_first,
+                        depth=depth + 1,
+                        context=context,
+                        name_pattern=name_pattern
+                    )
             else:
-                abstract_output(entry_path)
+                if name_pattern is None or fnmatch.fnmatch(entry, name_pattern):
+                    use_output_tool(entry_path)
         except (OSError, FileNotFoundError, PermissionError) as e:
             logging.error(f"Error processing {entry_path}: {e}")
 
     if process_dir_first:
-        abstract_output(directory)
+        if name_pattern is None or fnmatch.fnmatch(directory, name_pattern):
+            use_output_tool(directory)
 
 def find(
     folders: List[str],
     follow_symlink_signal: int = 0,
     process_dir_first: bool = False,
+    name: Optional[str] = None,
     timeout: Optional[int] = None,
-    agent_helper: Optional[Callable[[str], None]] = None,
-    search_depth: Optional[int] = -1
+    search_depth: Optional[int] = -1,
+    agent_helper: Optional[Callable[[str], None]] = None
 ):
 
     visited = set()
 
-    global  find_context
+    global find_context
     find_context = FindContext()
-    if search_depth is not None:
-        find_context.max_depth = search_depth
+    find_context.max_depth = search_depth
 
     follow_symlink_flag = follow_symlink_signal == 2
 
@@ -101,29 +117,35 @@ def find(
         timer = start_timer(timeout, lambda: find_context.handle_timeout(agent_helper))
 
     for folder in folders:
-        folder = os.path.abspath(os.path.expanduser(folder))    # Handle cases like '~'
+        # expanduser：handle cases like '~'
+        folder = os.path.abspath(os.path.expanduser(folder))
+
         if not os.path.exists(folder):
             logging.error(f"Error: The directory {folder} does not exist!")
             continue
 
         if folder in visited:
             continue
+
         visited.add(folder)
 
         if os.path.islink(folder) and not follow_symlink_flag:
-            abstract_output(folder)
+            if name is None or fnmatch.fnmatch(folder, name):
+                use_output_tool(folder)
             continue
 
         if os.path.isdir(folder):
             walk_dir(
                 directory=folder,
-                follow_symlink_flag = follow_symlink_flag,
-                process_dir_first=  process_dir_first,
-                depth= 1,
-                context = find_context
+                follow_symlink_flag=follow_symlink_flag,
+                process_dir_first=process_dir_first,
+                name_pattern=name,
+                depth=1,
+                context=find_context
             )
         else:
-            abstract_output(folder)
+            if name is None or fnmatch.fnmatch(folder, name):
+                use_output_tool(folder)
 
     if timeout is not None and timer.is_alive():
         timer.cancel()
@@ -140,6 +162,8 @@ def main():
 
     parser.add_argument("-d", action="store_true", help="Process directories before their contents.")
 
+    parser.add_argument("-name", help="Filter results by file or directory name pattern.")
+
     args = parser.parse_args()
 
     # Determine symlink behavior
@@ -152,8 +176,9 @@ def main():
     find(
         folders=args.folders,
         follow_symlink_signal=follow_symlink,
-        timeout=5,
         process_dir_first=args.d,
+        name=args.name,
+        timeout=1,
     )
 
 if __name__ == "__main__":
