@@ -1,4 +1,5 @@
 .vscode/
 *.o
-myfind
+find_c/myfind
 find_py/.idea/
+find_py/__pycache__

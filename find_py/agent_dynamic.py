@@ -38,7 +38,8 @@ Parameters:
         MUST use exp: agent_helper=agent_helper_dynamic
         
 You can use the find function to achieve the goal. No define, just use!
-Please only use python code to finish my request, no markdown, no other explanations!
+Please only use python code to finish my request.
+No markdown! No other explanations!
 '''
 
 chatbot.set_background_message(system_prompt)
