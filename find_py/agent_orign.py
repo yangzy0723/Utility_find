@@ -18,16 +18,19 @@ def find(
 ) -> None:
 Parameters:
     - folders (List[str]):
-        A list of directory paths to search through. If empty, the function defaults to searching the current working directory (".").
+        A list of directory paths to search through.
+        If empty, the function defaults to searching the current working directory (".").
     - follow_symlink_signal (int, default 0):
         A signal indicating how symlinks should be handled. It can take one of the following values:
-            0: Do not follow symlinks (default behavior).
-            1: Follow symlinks only if specified via the command-line argument -H.
-            2: Follow symlinks unconditionally, as specified by the command-line argument -L.
+            0: Do not follow symlinks (default behavior)
+            1: Follow symlinks only if specified via the command-line
+            2: Follow symlinks unconditionally
     - process_dir_first (bool, default True):
-        If True, directories will be processed first (printed before their contents). If False, directories will be processed after their contents (printed after traversal).
+        If True, directories will be processed first (printed before their contents).
+        If False, directories will be processed after their contents (printed after traversal).
     - name (str, optional):
-        The file need to be matched. Wildcard expressions can be used to satisfy fields.
+        The file need to be matched.
+        Wildcard expressions can be used to satisfy fields.
     - search_depth (int, optional):
         The maximum search depth for recursive search, -1 represents unlimited search depth.
         
