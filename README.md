@@ -77,4 +77,4 @@ make clean
     - 已优化搜索算法（兼容`bfs/dfs`），做到一边搜索一边应用谓词表达式进行判断
 - [x] `./myfind ~ -exec /bin/true {} \;`，上述命令会产生bug，已修复
 - [x] `./myfind ./include/lib -name lib`，上述命令会产生bug（无法查询目标文件），已修复
-- [ ] `./myfind ~ -exec /bin/true {} +`，仍未实现，目前仍是逐文件处理
+- [x] `./myfind ~ -name *.o -exec echo {} +`，仍未实现，目前仍是逐文件处理

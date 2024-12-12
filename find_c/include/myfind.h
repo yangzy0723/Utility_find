@@ -110,11 +110,12 @@ struct data
     size_t il_capacity; /**< `inode_list` 当前分配的容量，表示最多能容纳多少 inode。 */
 
     // 存储复合命令列表（如因式分解的表达式）
-    struct compound **c_list; /**< 存储因式分解的表达式列表，在构建 AST 前使用。 */
+    struct compound **c_list; /**< 存储复合命令的表达式列表，在构建 AST 前使用。 */
     size_t cl_size;           /**< `c_list` 中元素的当前数量。 */
     size_t cl_capacity;       /**< `c_list` 当前分配的容量，表示最多能容纳多少复合命令。 */
 
     // 存储需要批处理执行的文件(-exec [command] {} +)
+    char *batch_command;      /**< 批处理文件的命令 */
     char **batch_file_list;   /**< 存储需要批处理执行的文件，用于-exec [command] {} + */
     size_t bfl_size;          /**< `batch_file_list` 中元素的当前数量。 */
     size_t bfl_capacity;      /**< `batch_file_list` 当前分配的容量，表示最多能容纳多少批处理执行的文件。 */
@@ -167,6 +168,16 @@ int update_option(struct data *d, char *opt);
 void generate_nodes(struct data *d);
 
 /**
+ * @brief 处理未到达批处理临界的最后一批次数据
+ *
+ * @param d 指向 `struct data` 的指针。
+ * 
+ * @return 如果成功，返回 0；如果出现错误（例如无效的语法），返回 1。
+
+ */
+int deal_batch_remaining(struct data *d);
+
+/**
  * @brief 遍历表达式列表（e_list），并根据每个表达式的类型创建相应的复合表达式，将其添加到复合表达式列表（c_list）中。
  *
  * 该函数会遍历 `data` 结构体中的表达式列表（`e_list`），
@@ -199,6 +210,7 @@ void build_ast(struct ast *ast);
  * 该函数根据 AST 节点的类型（如 THEN、AND、OR、PRINT、CONDITION、EXECP 和 EXEC 执行不同的操作，
  * 处理节点的条件判断、命令执行等。
  *
+ * @param d 指向 `data` 结构体的指针
  * @param parent 父节点指针，用于更新父节点的返回值。
  * @param ast 当前执行的节点（AST）指针。
  * @param n 当前处理的节点信息（如文件名、类型等）。
@@ -206,7 +218,7 @@ void build_ast(struct ast *ast);
  *
  * @return 返回执行结果，表示是否成功执行某个操作。
  */
-int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child);
+int exec_ast(struct data *d, struct ast *parent, struct ast *ast, struct node *n, int child);
 
 /**
  * @brief 动态扩展 `struct data` 中的数组容量
@@ -257,7 +269,7 @@ void add_exp(struct data *d, char *exp);
  * @param ino 目录的 inode 值。
  * @param d 指向 `struct data` 的指针，其中包含 `inode_list` 数组和相关容量信息（`il_size` 和 `il_capacity`）。
  */
-void add_inode(int ino, struct data *d);
+void add_inode(struct data *d, int ino);
 
 /**
  * @brief 检查指定的 inode 是否已经存在于 `inode_list` 中
@@ -269,7 +281,7 @@ void add_inode(int ino, struct data *d);
  * @param d 指向 `struct data` 的指针，其中包含 `inode_list` 数组和相关的信息。
  * @return 如果 `ino` 存在于 `inode_list` 中，返回 1；否则返回 0。
  */
-int inode_exists(int ino, struct data *d);
+int inode_exists(struct data *d, int ino);
 
 /**
  * @brief 将一个新的节点添加到 `nodes` 数组
@@ -298,6 +310,18 @@ void add_node(char *name, char *name_wp, mode_t type, mode_t r_type, struct data
 void add_compound(struct data *d, char *name, char **args, enum enum_type et);
 
 /**
+ * 将一个批处理文件添加到 `data` 结构体的 `batch_file_list` 中。
+ * 如果当前 `batch_file_list` 数组的容量已满，函数会调用 `my_realloc` 来扩展数组的容量，然后将新的节点添加进去。
+ *
+ * @param d            指向 `data` 结构体的指针，该结构体包含批处理文件列表。
+ * @param batch_file   指向要添加的批处理文件字符串的指针。
+ *
+ * @return             如果批处理文件成功添加，返回 1；
+ *                     如果列表已达到最大允许大小 (`MAX_BATCH_SIZE`)，返回 0。
+ */
+int add_batch_file(struct data *d, char *batch_file);
+
+/**
  * @brief 递归遍历指定目录并处理每个文件或子目录
  *
  * 该函数递归地遍历给定目录 `name`，对目录中的每个文件和子目录执行特定操作。在遍历过程中，
@@ -308,18 +332,6 @@ void add_compound(struct data *d, char *name, char **args, enum enum_type et);
  * @param d 指向 `struct data` 的指针，包含需要的数组和信息，用于存储遍历结果。
  */
 void parse_dir(char *name, struct data *d);
-
-/**
- * @brief 将一个新的复合命令（compound）添加到 data 结构体中的 c_list（复合命令列表）。
- *
- * 该函数创建一个新的复合命令，将其添加到 `data` 结构体中的 `c_list`（复合命令列表）。首先，函数会分配内存并初始化复合命令结构体，设置命令的名称、参数和命令类型。接着，如果 `c_list` 的当前容量不足以容纳新的命令，则会调用 `my_realloc` 函数重新分配内存。
- *
- * @param d 指向 `data` 结构体的指针，包含复合命令列表（c_list）。
- * @param name 新复合命令的名称。
- * @param args 新复合命令的参数数组。
- * @param et 新复合命令的类型（枚举类型 `enum_type`）。
- */
-void add_compound(struct data *d, char *name, char **args, enum enum_type et);
 
 /**
  * @brief 在抽象语法树 (AST) 中找到匹配的右括号 (PAC)。

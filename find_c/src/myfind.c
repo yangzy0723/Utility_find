@@ -8,11 +8,12 @@
 #include <fnmatch.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#define MAX_BATCH_SIZE 4096
 
 int main(int argc, char *argv[])
 {
@@ -63,6 +64,8 @@ int main(int argc, char *argv[])
     }
 
     generate_nodes(&d);
+    if (d.bfl_size)
+        deal_batch_remaining(&d);
     // for (int i = 0; i < d.no_size; i++)
     // {
     //     if (d.ast->left)
@@ -158,44 +161,68 @@ void generate_nodes(struct data *d)
         {
             if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 1 || d->option == 2))
             {
-                add_inode(sb.st_ino, d);
+                add_inode(d, sb.st_ino);
                 parse_dir(d->search_path_list[i], d);
             }
             // 传入的name_wp应该是目录/文件名，不包含路径
-            if (strcmp(d->search_path_list[i], ".") == 0 
-                || strcmp(d->search_path_list[i], "..") == 0
-                || strcmp(d->search_path_list[i], "/") == 0)
+            if (my_strcmp(d->search_path_list[i], ".") == 0 || my_strcmp(d->search_path_list[i], "..") == 0 || my_strcmp(d->search_path_list[i], "/") == 0)
                 add_node(d->search_path_list[i], my_strcp(d->search_path_list[i]), types[0], types[1], d);
             else
             {
-                char* last_slash = my_strrchr(d->search_path_list[i], '/');
-                char* f_name = my_strcp(last_slash + 1);
+                char *last_slash = my_strrchr(d->search_path_list[i], '/');
+                char *f_name = my_strcp(last_slash + 1);
                 add_node(d->search_path_list[i], f_name, types[0], types[1], d);
-            }    
+            }
             free_il(d);
         }
         // 广度优先搜索
         else
         {
             // 传入的name_wp应该是目录/文件名，不包含路径
-            if (strcmp(d->search_path_list[i], ".") == 0 
-                || strcmp(d->search_path_list[i], "..") == 0
-                || strcmp(d->search_path_list[i], "/") == 0)
+            if (my_strcmp(d->search_path_list[i], ".") == 0 || my_strcmp(d->search_path_list[i], "..") == 0 || my_strcmp(d->search_path_list[i], "/") == 0)
                 add_node(d->search_path_list[i], my_strcp(d->search_path_list[i]), types[0], types[1], d);
             else
             {
-                char* last_slash = my_strrchr(d->search_path_list[i], '/');
-                char* f_name = my_strcp(last_slash + 1);
+                char *last_slash = my_strrchr(d->search_path_list[i], '/');
+                char *f_name = my_strcp(last_slash + 1);
                 add_node(d->search_path_list[i], f_name, types[0], types[1], d);
-            }   
+            }
             if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 1 || d->option == 2))
             {
-                add_inode(sb.st_ino, d);
+                add_inode(d, sb.st_ino);
                 parse_dir(d->search_path_list[i], d);
             }
             free_il(d);
         }
     }
+}
+
+int deal_batch_remaining(struct data *d) {
+    char **args_batch = calloc(d->bfl_size + 2, sizeof(char *));
+    int ret = 0;
+    // TODO: 如果需要批处理，必然有-exec，此时c_list[0]->args[0]就是批处理命令
+    args_batch[0] = my_strcp(d->batch_command);
+    for (int i = 0; i < d->bfl_size; i++)
+        args_batch[i + 1] = my_strcp(d->batch_file_list[i]);
+    args_batch[d->bfl_size + 1] = NULL;
+    pid_t pid = fork();
+    // child
+    if (pid == 0)
+    {
+        execvp(args_batch[0], args_batch);
+        fprintf(stderr, "An error occured while execvp\n");
+        exit(1);
+    }
+    // father
+    else
+    {
+        waitpid(pid, &ret, 0);
+        for (size_t k = 0; k < d->bfl_size + 2; k++)
+            free(args_batch[k]);
+        free(args_batch);
+    }
+    free_bfl(d);
+    return ret;    
 }
 
 int create_c_list(struct data *d)
@@ -234,7 +261,7 @@ int create_c_list(struct data *d)
         {
             size_t index = 1;
             // Need handle wrong commands
-            while (my_strcmp(";", d->exp_list[index + i]) && my_strcmp("+", d->exp_list[index + i]))
+            while (my_strcmp(";", d->exp_list[i + index]) && my_strcmp("+", d->exp_list[i + index]))
             {
                 index++;
                 if (index >= d->el_size)
@@ -319,7 +346,7 @@ void build_ast(struct ast *ast)
     }
 }
 
-int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
+int exec_ast(struct data *d, struct ast *parent, struct ast *ast, struct node *n, int child)
 {
     int status = 0;
     switch (ast->et)
@@ -327,7 +354,7 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
     case THEN:
         if (ast->left->et == NO)
         {
-            if (exec_ast(ast, ast->right, n, 1))
+            if (exec_ast(d, ast, ast->right, n, 1))
             {
                 parent->rvalue[child] = 0;
                 return 0;
@@ -339,10 +366,10 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
                 return 1;
             }
         }
-        else if (exec_ast(ast, ast->left, n, 0))
+        else if (exec_ast(d, ast, ast->left, n, 0))
         {
             if (ast->right)
-                exec_ast(ast, ast->right, n, 1);
+                exec_ast(d, ast, ast->right, n, 1);
             else
                 ast->rvalue[1] = 1;
         }
@@ -358,7 +385,7 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
         }
         break;
     case AND:
-        if (exec_ast(ast, ast->left, n, 0) && exec_ast(ast, ast->right, n, 1))
+        if (exec_ast(d, ast, ast->left, n, 0) && exec_ast(d, ast, ast->right, n, 1))
         {
             parent->rvalue[child] = 1;
             return 1;
@@ -370,7 +397,7 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
         }
         break;
     case OR:
-        if (exec_ast(ast, ast->left, n, 0) || exec_ast(ast, ast->right, n, 1))
+        if (exec_ast(d, ast, ast->left, n, 0) || exec_ast(d, ast, ast->right, n, 1))
         {
             parent->rvalue[child] = 1;
             return 1;
@@ -443,9 +470,45 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
                     // 进入该if，保证已经存在一对紧密相连的大括号{}
                     new_args[j] = replace_echo(ast->c_list[0]->args[j], n->name);
                 else
-                    new_args[j] = my_strcp(ast->c_list[0]->args[j]);
-            printf("%s %s %s\n", new_args[0], new_args[1], new_args[2]);
+                    new_args[j] = my_strcp(ast->c_list[0]->args[j]);\
+            // 用于记录exec命令，用于处理未到达批处理临界的最后一批次数据
+            d->batch_command = my_strcp(new_args[0]);
+            for (size_t j = 1; j < i; j++)
+            {
+                // 考虑到垃圾回收机制，字符串拷贝时需要使用my_strcp，而不能直接赋值
+                if (!add_batch_file(d, new_args[1]))
+                {
+                    char **new_args_batch = calloc(d->bfl_size + 2, sizeof(char *));
+                    new_args_batch[0] = my_strcp(new_args[0]);
+                    for (int k = 1; k <= d->bfl_size; k++)
+                        new_args_batch[k] = my_strcp(d->batch_file_list[k - 1]);
+                    new_args_batch[d->bfl_size + 1] = NULL;
+                    pid_t pid = fork();
+                    // child
+                    if (pid == 0)
+                    {
+                        execvp(new_args_batch[0], new_args_batch);
+                        fprintf(stderr, "An error occured while execvp\n");
+                        exit(1);
+                    }
+                    // father
+                    else
+                    {
+                        waitpid(pid, &status, 0);
+                        for (size_t k = 0; k < d->bfl_size + 2; k++)
+                            free(new_args_batch[k]);
+                        free(new_args_batch);
+                    }
+                    free_bfl(d);
+                    add_batch_file(d, new_args[i]);
+                }
+            }
+            for (size_t j = 0; j < i; j++)
+                free(new_args[j]);
+            free(new_args);
         }
+        return status;
+        break;
     case EXEC:
         if (ast->cl_size > 0)
         {
@@ -460,16 +523,18 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
                 else
                     new_args[j] = my_strcp(ast->c_list[0]->args[j]);
             pid_t pid = fork();
-            if (pid == 0) // child
+            // child
+            if (pid == 0)
             {
-                execvp(new_args[0], new_args); // foo should appear on stdout
+                execvp(new_args[0], new_args);
                 fprintf(stderr, "An error occured while execvp\n");
                 exit(1);
             }
-            else // father
+            // father
+            else
             {
                 waitpid(pid, &status, 0);
-                for (size_t j = 0; j < i; j++)
+                for (size_t j = 0; j < i + 1; j++)
                     free(new_args[j]);
                 free(new_args);
             }
@@ -545,7 +610,7 @@ void add_exp(struct data *d, char *exp)
     }
 }
 
-void add_inode(int ino, struct data *d)
+void add_inode(struct data *d, int ino)
 {
     if (d->il_size < d->il_capacity)
     {
@@ -555,11 +620,11 @@ void add_inode(int ino, struct data *d)
     else
     {
         my_realloc(d, 3);
-        add_inode(ino, d);
+        add_inode(d, ino);
     }
 }
 
-int inode_exists(int ino, struct data *d)
+int inode_exists(struct data *d, int ino)
 {
     for (size_t i = 0; i < d->il_size; i++)
         if (d->inode_list[i] == ino)
@@ -580,7 +645,7 @@ void add_node(char *name, char *name_wp, mode_t type, mode_t r_type,
     d->nodes[d->no_size] = n;
     d->no_size++;
     if (d->ast->left)
-        exec_ast(d->ast, d->ast, n, 0);
+        exec_ast(d, d->ast, d->ast, n, 0);
     if (!d->actions && d->ast->rvalue[0] == 1 && d->ast->rvalue[1] == 1)
         printf("%s\n", n->name);
     reset_rvalues(d->ast);
@@ -595,6 +660,27 @@ void add_compound(struct data *d, char *name, char **args, enum enum_type et)
     if (d->cl_size >= d->cl_capacity)
         my_realloc(d, 4);
     d->c_list[d->cl_size] = c;
+}
+
+int add_batch_file(struct data *d, char *batch_file)
+{
+    if (d->bfl_size < d->bfl_capacity)
+    {
+        d->batch_file_list[d->bfl_size] = my_strcp(batch_file);
+        d->bfl_size++;
+        return 1;
+    }
+    else
+    {
+        if (d->bfl_size >= MAX_BATCH_SIZE)
+            return 0;
+        else
+        {
+            my_realloc(d, 5);
+            add_batch_file(d, batch_file);
+            return 1;
+        }
+    }
 }
 
 void parse_dir(char *name, struct data *d)
@@ -623,11 +709,11 @@ void parse_dir(char *name, struct data *d)
             if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 2))
             {
                 // 检查是否已解析过该inode
-                if (inode_exists(sb.st_ino, d))
+                if (inode_exists(d, sb.st_ino))
                     d->return_value = 1;
                 else
                 {
-                    add_inode(sb.st_ino, d);
+                    add_inode(d, sb.st_ino);
                     parse_dir(new_name, d);
                 }
             }
@@ -641,11 +727,11 @@ void parse_dir(char *name, struct data *d)
             if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 2))
             {
                 // 检查是否已解析过该inode
-                if (inode_exists(sb.st_ino, d))
+                if (inode_exists(d, sb.st_ino))
                     d->return_value = 1;
                 else
                 {
-                    add_inode(sb.st_ino, d);
+                    add_inode(d, sb.st_ino);
                     parse_dir(new_name, d);
                 }
             }
@@ -755,7 +841,9 @@ int is_ast_valid(struct data *d, struct ast *parent, struct ast *ast, int child)
         break;
     case PRINT:
     case EXEC:
+    case EXECP:
         d->actions = 1;
+        break;
     default:
         break;
     }
@@ -782,6 +870,8 @@ void free_il(struct data *d)
 
 void free_bfl(struct data *d)
 {
+    for (int i = 0; i < d->bfl_size; i++)
+        free(d->batch_file_list[i]);
     free(d->batch_file_list);
     d->batch_file_list = calloc(10, sizeof(char *));
     d->bfl_size = 0;
@@ -808,16 +898,25 @@ void free_data(struct data *d)
         free(d->nodes[i]);
     }
     free(d->nodes);
+    
     for (size_t i = 0; i < d->el_size; i++)
         free(d->exp_list[i]);
     free(d->exp_list);
+    
     free(d->inode_list);
+    
+    for (size_t i = 0; i < d->spl_size; i++)
+        free(d->search_path_list[i]);
     free(d->search_path_list);
+    
+    free(d->batch_file_list);
+    
     for (size_t i = 0; i < d->cl_size; i++)
     {
         free(d->c_list[i]->args);
         free(d->c_list[i]);
     }
+    
     free_ast(d->ast);
 }
 
