@@ -73,6 +73,8 @@ make clean
 
 ## Todo
 
-- [x] 当前开启选项`-d/-depth`（myfind需要在处理目录的内容之前先处理该目录本身），处理方法是`invert_node_list`。此法不好，将导致为了兼容`-d`，需要在找齐所有文件后统一应用谓词表达式。需要优化搜索算法（兼容`bfs/dfs`），做到一边搜索一边应用谓词表达式进行判断。
-- [x] `time ./myfind ~ -exec /bin/true {} \;`，有bug
-- [ ] `time ./myfind ~ -exec /bin/true {} +`，仍未实现，目前仍是逐文件处理
+- [x] 当前开启选项`-d/-depth`（myfind需要在处理目录的内容之前先处理该目录本身），处理方法是`invert_node_list`。此法不好，将导致为了兼容`-d`，需要在找齐所有文件后统一应用谓词表达式
+    - 已优化搜索算法（兼容`bfs/dfs`），做到一边搜索一边应用谓词表达式进行判断
+- [x] `./myfind ~ -exec /bin/true {} \;`，上述命令会产生bug，已修复
+- [x] `./myfind ./include/lib -name lib`，上述命令会产生bug（无法查询目标文件），已修复
+- [ ] `./myfind ~ -exec /bin/true {} +`，仍未实现，目前仍是逐文件处理

@@ -31,10 +31,24 @@ char *my_strcp(char *str)
     size_t size = my_strlen(str);
     char *new_str = calloc(size + 1, 1);
     for (size_t i = 0; i < size; i++)
-    {
         new_str[i] = str[i];
-    }
     return new_str;
+}
+
+char* my_strrchr(char* str, int ch) {
+    char* last_occurrence = NULL;
+
+    while (*str) {
+        if (*str == (char)ch) {
+            last_occurrence = str;
+        }
+        str++;
+    }
+
+    if (ch == '\0')
+        return (char*)str;
+
+    return (char*)last_occurrence;
 }
 
 char *my_concate(char *dir, char *file)

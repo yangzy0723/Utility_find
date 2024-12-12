@@ -36,6 +36,15 @@ int my_strcmp(char *str1, char *str2);
 char *my_strcp(char *str);
 
 /**
+ * @brief 从左向右边查找字符串中某个字符最后一次出现的位置。
+ * 
+ * @param str 指向要搜索的字符串。
+ * @param ch 要查找的字符（作为 int 传递）。
+ * @return char* 指向字符串中最后一个匹配字符的位置；如果未找到，返回 NULL。
+ */
+char* my_strrchr(char* str, int ch);
+
+/**
  * @brief 将目录路径和文件名连接成一个完整的路径
  *
  * 该函数将两个字符串 `dir`（目录路径）和 `file`（文件名）连接成一个完整的路径。如果 `dir` 已经以 `/` 结尾，则直接连接 `file`；如果 `dir` 没有 `/` 结尾，则会在两者之间添加一个 `/`。最终返回一个新的字符串，表示完整路径。

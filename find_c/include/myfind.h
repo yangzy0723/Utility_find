@@ -114,6 +114,12 @@ struct data
     size_t cl_size;           /**< `c_list` 中元素的当前数量。 */
     size_t cl_capacity;       /**< `c_list` 当前分配的容量，表示最多能容纳多少复合命令。 */
 
+    // 存储需要批处理执行的文件(-exec [command] {} +)
+    char **batch_file_list;   /**< 存储需要批处理执行的文件，用于-exec [command] {} + */
+    size_t bfl_size;          /**< `batch_file_list` 中元素的当前数量。 */
+    size_t bfl_capacity;      /**< `batch_file_list` 当前分配的容量，表示最多能容纳多少批处理执行的文件。 */
+
+
     // 抽象语法树（AST）
     struct ast *ast; /**< 存储抽象语法树，用于表示命令或表达式的树状结构。 */
 
@@ -215,6 +221,7 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child);
  *          - id = 2 扩展 `nodes` 数组
  *          - id = 3 扩展 `inode_list` 数组
  *          - id = 4 扩展 `c_list` 数组
+ *          - id = 5 扩展 `batch_file_list` 数组
  */
 void my_realloc(struct data *d, int id);
 
@@ -406,6 +413,16 @@ void reset_rvalues(struct ast *root);
  * @param d 指向 `struct data` 的指针，其中包含 `inode_list` 数组以及相关的容量和大小信息。
  */
 void free_il(struct data *d);
+
+/**
+ * @brief 释放并重新初始化 `batch_file_list` 数组
+ *
+ * 该函数用于释放 `struct data` 结构体中的 `batch_file_list` 数组所占用的内存，并重新初始化该数组。
+ * 在释放内存后，`batch_file_list` 数组会被分配一个新的、容量为 10 的内存块，并将相关的计数器（`bfl_size` 和 `bfl_capacity`）重置为初始值。
+ *
+ * @param d 指向 `struct data` 的指针，其中包含 `inode_list` 数组以及相关的容量和大小信息。
+ */
+void free_bfl(struct data *d);
 
 /**
  * @brief 递归释放抽象语法树 (AST) 的内存。

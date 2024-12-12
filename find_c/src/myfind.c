@@ -71,7 +71,6 @@ int main(int argc, char *argv[])
     //         printf("%s\n", d.nodes[i]->name);
     //     reset_rvalues(d.ast);
     // }
-
     int rvalue = d.return_value;
     free_data(&d);
     return (rvalue);
@@ -82,21 +81,24 @@ void init_data(struct data *d)
     d->option = 0;
     d->return_value = 0;
     d->d_checked = 0;
-    d->spl_size = 0;
-    d->el_size = 0;
-    d->no_size = 0;
-    d->il_size = 0;
     d->search_path_list = calloc(10, sizeof(char *));
     d->exp_list = calloc(10, sizeof(char *));
     d->nodes = calloc(10, sizeof(struct node *));
     d->inode_list = calloc(10, sizeof(int));
     d->c_list = calloc(10, sizeof(struct compound *));
+    d->batch_file_list = calloc(10, sizeof(char *));
+    d->spl_size = 0;
+    d->el_size = 0;
+    d->no_size = 0;
+    d->il_size = 0;
+    d->cl_size = 0;
+    d->bfl_size = 0;
     d->spl_capacity = 10;
     d->el_capacity = 10;
     d->no_capacity = 10;
     d->il_capacity = 10;
-    d->cl_size = 0;
     d->cl_capacity = 10;
+    d->bfl_capacity = 10;
     d->actions = 0;
     d->ast = calloc(1, sizeof(struct ast));
     d->ast->left = NULL;
@@ -159,13 +161,33 @@ void generate_nodes(struct data *d)
                 add_inode(sb.st_ino, d);
                 parse_dir(d->search_path_list[i], d);
             }
-            add_node(d->search_path_list[i], my_strcp(d->search_path_list[i]), types[0], types[1], d);
+            // 传入的name_wp应该是目录/文件名，不包含路径
+            if (strcmp(d->search_path_list[i], ".") == 0 
+                || strcmp(d->search_path_list[i], "..") == 0
+                || strcmp(d->search_path_list[i], "/") == 0)
+                add_node(d->search_path_list[i], my_strcp(d->search_path_list[i]), types[0], types[1], d);
+            else
+            {
+                char* last_slash = my_strrchr(d->search_path_list[i], '/');
+                char* f_name = my_strcp(last_slash + 1);
+                add_node(d->search_path_list[i], f_name, types[0], types[1], d);
+            }    
             free_il(d);
         }
         // 广度优先搜索
         else
         {
-            add_node(d->search_path_list[i], my_strcp(d->search_path_list[i]), types[0], types[1], d);
+            // 传入的name_wp应该是目录/文件名，不包含路径
+            if (strcmp(d->search_path_list[i], ".") == 0 
+                || strcmp(d->search_path_list[i], "..") == 0
+                || strcmp(d->search_path_list[i], "/") == 0)
+                add_node(d->search_path_list[i], my_strcp(d->search_path_list[i]), types[0], types[1], d);
+            else
+            {
+                char* last_slash = my_strrchr(d->search_path_list[i], '/');
+                char* f_name = my_strcp(last_slash + 1);
+                add_node(d->search_path_list[i], f_name, types[0], types[1], d);
+            }   
             if (S_ISDIR(sb.st_mode) && (!islnk || d->option == 1 || d->option == 2))
             {
                 add_inode(sb.st_ino, d);
@@ -410,6 +432,20 @@ int exec_ast(struct ast *parent, struct ast *ast, struct node *n, int child)
         }
         break;
     case EXECP:
+        if (ast->cl_size > 0)
+        {
+            size_t i = 0;
+            while (ast->c_list[0]->args[i] != NULL)
+                i++;
+            char **new_args = calloc(i + 1, sizeof(char *));
+            for (size_t j = 0; j < i; j++)
+                if (brackets_finder(ast->c_list[0]->args[j]) == 0)
+                    // 进入该if，保证已经存在一对紧密相连的大括号{}
+                    new_args[j] = replace_echo(ast->c_list[0]->args[j], n->name);
+                else
+                    new_args[j] = my_strcp(ast->c_list[0]->args[j]);
+            printf("%s %s %s\n", new_args[0], new_args[1], new_args[2]);
+        }
     case EXEC:
         if (ast->cl_size > 0)
         {
@@ -473,6 +509,11 @@ void my_realloc(struct data *d, int id)
     {
         d->cl_capacity *= 2;
         d->c_list = realloc(d->c_list, d->cl_capacity * sizeof(struct compound *));
+    }
+    else if (id == 5)
+    {
+        d->bfl_capacity *= 2;
+        d->batch_file_list = realloc(d->batch_file_list, d->bfl_capacity * sizeof(char *));
     }
 }
 
@@ -538,7 +579,6 @@ void add_node(char *name, char *name_wp, mode_t type, mode_t r_type,
         my_realloc(d, 2);
     d->nodes[d->no_size] = n;
     d->no_size++;
-
     if (d->ast->left)
         exec_ast(d->ast, d->ast, n, 0);
     if (!d->actions && d->ast->rvalue[0] == 1 && d->ast->rvalue[1] == 1)
@@ -738,6 +778,14 @@ void free_il(struct data *d)
     d->inode_list = calloc(10, sizeof(int));
     d->il_size = 0;
     d->il_capacity = 10;
+}
+
+void free_bfl(struct data *d)
+{
+    free(d->batch_file_list);
+    d->batch_file_list = calloc(10, sizeof(char *));
+    d->bfl_size = 0;
+    d->bfl_capacity = 10;
 }
 
 void free_ast(struct ast *ast)
