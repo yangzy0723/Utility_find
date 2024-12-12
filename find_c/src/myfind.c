@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 
     generate_nodes(&d);
     if (d.bfl_size)
-        deal_batch_remaining(&d);
+        d.return_value = deal_batch_remaining(&d);
     // for (int i = 0; i < d.no_size; i++)
     // {
     //     if (d.ast->left)
@@ -74,7 +74,8 @@ int main(int argc, char *argv[])
     //         printf("%s\n", d.nodes[i]->name);
     //     reset_rvalues(d.ast);
     // }
-    int rvalue = d.return_value;
+    int rvalue = 0;
+    rvalue = d.return_value;
     free_data(&d);
     return (rvalue);
 }
@@ -217,8 +218,8 @@ int deal_batch_remaining(struct data *d) {
     else
     {
         waitpid(pid, &ret, 0);
-        for (size_t k = 0; k < d->bfl_size + 2; k++)
-            free(args_batch[k]);
+        for (size_t i = 0; i < d->bfl_size + 2; i++)
+            free(args_batch[i]);
         free(args_batch);
     }
     free_bfl(d);
@@ -916,7 +917,6 @@ void free_data(struct data *d)
         free(d->c_list[i]->args);
         free(d->c_list[i]);
     }
-    
     free_ast(d->ast);
 }
 
