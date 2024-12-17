@@ -1,7 +1,7 @@
 from llm import Chatbot
 
-timeout = 2
-depth = -1
+timeout = 60
+depth = 5
 name_pattern = "mlsys"
 
 chatbot = Chatbot(

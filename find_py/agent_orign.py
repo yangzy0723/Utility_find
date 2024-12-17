@@ -1,6 +1,6 @@
 from llm import Chatbot
 
-timeout = 1
+timeout = 60
 depth = 5
 name_pattern = "*mlsys*"
 
@@ -45,8 +45,7 @@ chatbot.set_background_message(system_prompt)
 
 llm_ret = chatbot.get_response(f'''
     Search ~ to find files with the {name_pattern} field in their names.
-    You may use multithread programming.
-    If the time exceeds {timeout} second, stop the search and modify search_max_depth to {depth}.
+    If the time exceeds {timeout} second, modify search_max_depth to {depth}.
 ''')
 print("------------ code to be executed -----------------")
 print(llm_ret)

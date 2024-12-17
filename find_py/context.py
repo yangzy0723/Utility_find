@@ -1,5 +1,7 @@
 import inspect
 import logging
+import time
+
 from typing import Optional, Callable
 
 def set_search_depth(search_depth: int):
@@ -10,7 +12,6 @@ def execute_llm_code(code_str, globals):
     print("-------------- this is code str-------------------")
     print(code_str)
     print("--------------------------------------------------")
-
     exec_globals = {'__builtins__': None}    # Create a restricted execution environment.
     exec_globals.update(globals)
 
@@ -30,6 +31,7 @@ class FindContext:
         self.allowed_functions = {'set_search_depth': set_search_depth}
 
     def handle_timeout(self, agent_helper: Optional[Callable[[Optional[str]], str]]):
+        print("Timeout")
         from utility_find import find_context
         self.timeout_occurred = True
         if not self.has_result:
@@ -43,7 +45,11 @@ class FindContext:
             else:
                 if len(inspect.signature(agent_helper).parameters) > 0:
                     prompt = "A timeout event has occurred, please take appropriate action."
+                    # start_time = time.time()
                     agent_ret = agent_helper(prompt)
+                    # end_time = time.time()
+                    # execution_time = end_time - start_time
+                    # print(f"Time taken to get response from LLM: {execution_time:.2f} seconds")
                 else:
                     agent_ret = agent_helper()
                 execute_llm_code(agent_ret, self.allowed_functions)

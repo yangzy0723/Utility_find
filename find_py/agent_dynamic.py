@@ -1,3 +1,5 @@
+import time
+
 from llm import Chatbot
 
 chatbot = Chatbot(
@@ -53,10 +55,15 @@ chatbot.set_background_message(system_prompt)
 def agent_helper_dynamic(help_prompt : str) -> str:
     return chatbot.get_response(help_prompt)
 
+# start_time = time.time()
 llm_ret = chatbot.get_response('''
-    Search / to find files with the "mlsys" field in their names.
-    If the time exceeds 60 seconds, modify search_max_depth to 5.
+    Search ~ to find all files with the "mlsys" field in their names.
+    If the time exceeds 2 seconds, modify search_max_depth to 5.
 ''')
+# end_time = time.time()
+# execution_time = end_time - start_time
+# print(f"Time taken to get response from LLM: {execution_time:.2f} seconds")
+
 print("------------ code to be executed -----------------")
 print(llm_ret)
 print("--------------------------------------------------")

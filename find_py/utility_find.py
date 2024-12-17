@@ -2,7 +2,6 @@ import argparse
 import fnmatch
 import logging
 import os
-import sys
 import threading
 
 from typing import Callable, List, Optional
@@ -12,10 +11,12 @@ from context import FindContext
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 f = open("res.txt", "w")
-def out_put(message: str):
-    print(message)
-    # f.write(message + '\n')
-    find_context.has_result = True
+def out_put(message: str, op: int):
+    if op == 0:
+        print(message)
+    elif op == 1:
+        f.write(message + '\n')
+        find_context.has_result = True
 
 def start_timer(timeout_seconds: int, callback: Callable):
     timer = threading.Timer(timeout_seconds, callback)
@@ -37,15 +38,17 @@ def walk_dir(
         return
 
     if not process_dir_first:
+        out_put(directory, 0)
         if name_pattern is None or fnmatch.fnmatch(directory, name_pattern):
-            out_put(directory)
+            out_put(directory, 1)
 
     for entry in entries:
         entry_path = os.path.join(directory, entry)
         try:
             if os.path.islink(entry_path) and not follow_symlink_flag:
+                out_put(entry_path, 0)
                 if name_pattern is None or fnmatch.fnmatch(entry, name_pattern):
-                    out_put(entry_path)
+                    out_put(entry_path, 1)
                 continue
 
             if os.path.isdir(entry_path):
@@ -59,14 +62,16 @@ def walk_dir(
                         name_pattern=name_pattern
                     )
             else:
+                out_put(entry_path, 0)
                 if name_pattern is None or fnmatch.fnmatch(entry, name_pattern):
-                    out_put(entry_path)
+                    out_put(entry_path, 1)
         except (OSError, FileNotFoundError, PermissionError) as e:
             logging.error(f"Error processing {entry_path}: {e}")
 
     if process_dir_first:
+        out_put(directory, 0)
         if name_pattern is None or fnmatch.fnmatch(directory, name_pattern):
-            out_put(directory)
+            out_put(directory, 1)
 
 find_context = None
 
@@ -104,8 +109,9 @@ def find(
         visited.add(folder)
 
         if os.path.islink(folder) and not follow_symlink_signal:
+            out_put(folder, 0)
             if name is None or fnmatch.fnmatch(folder, name):
-                out_put(folder)
+                out_put(folder, 1)
             continue
 
         if os.path.isdir(folder):
@@ -118,8 +124,9 @@ def find(
                 context=find_context
             )
         else:
+            out_put(folder, 0)
             if name is None or fnmatch.fnmatch(folder, name):
-                out_put(folder)
+                out_put(folder, 1)
 
     if timeout is not None and timer.is_alive():
         timer.cancel()
