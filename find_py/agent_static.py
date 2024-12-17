@@ -1,5 +1,4 @@
 from llm import Chatbot
-from utility_find import find
 
 chatbot = Chatbot(
     api_key='sk-CyDXPaWtLzftviXwCQtZZAAYO4EuvhQQ4nzBzEwy8I7xIEvx',
@@ -11,8 +10,8 @@ system_prompt = '''
 This is how find work:
 def find(
     folders: List[str],
-    follow_symlink_signal: int = 0,
-    process_dir_first: bool = False,
+    follow_symlink_signal: Optional[int] = 0,
+    process_dir_first: Optional[bool] = False,
     name: Optional[str] = None,
     timeout: Optional[int] = None,
     agent_helper: Optional[Callable[[str], None]] = None
@@ -38,7 +37,11 @@ Parameters:
 
     agent_helper(Timeout Callback):
         Task: When a timeout occurs, specific code needs to be executed. 
-            Please define the agent_helper_static function to achieve the request. For example, you may modify find_context.max_depth
+            Please define the agent_helper_static function to achieve the request.
+            There are some functions you can use directly:
+                ```python
+                set_search_depth(_d: int) # change search depth to _d
+                ```
             Then, return the code as a ** string **.
     agent_helper
         MUST use exp: agent_helper=agent_helper_static
@@ -48,12 +51,15 @@ You can use the find function to achieve the goal. No define, just use!
 Please only use python code to finish my request.
 No markdown! No other explanations!
 '''
-
 chatbot.set_background_message(system_prompt)
 
 llm_ret = chatbot.get_response('''
-Search ~ to find files with the "mlsys" field in their names.
-If the time exceeds 1 second, modify search_max_depth to 5.
+    Search ~ to find files with the "mlsys" field in their names.
+    If the time exceeds 1 second, modify search_max_depth to 5.
 ''')
-print("From LLM, code to be executed:\n  " + llm_ret)
+print("------------ code to be executed -----------------")
+print(llm_ret)
+print("--------------------------------------------------")
+
+from utility_find import find
 exec(llm_ret)

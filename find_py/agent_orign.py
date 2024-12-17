@@ -1,11 +1,14 @@
-import multiprocessing
-
 from llm import Chatbot
-from utility_find import find
 
 timeout = 1
 depth = 5
 name_pattern = "*mlsys*"
+
+chatbot = Chatbot(
+    api_key='sk-CyDXPaWtLzftviXwCQtZZAAYO4EuvhQQ4nzBzEwy8I7xIEvx',
+    base_url='https://api.chatanywhere.tech/v1',
+    model='gpt-4o-mini'
+)
 
 system_prompt = '''
 This is how find work:
@@ -38,19 +41,19 @@ You can use the find function to achieve the goal. No define, just use!
 Please only use python code to finish my request.
 No markdown! No other explanations!
 '''
-chatbot = Chatbot(
-    api_key='sk-CyDXPaWtLzftviXwCQtZZAAYO4EuvhQQ4nzBzEwy8I7xIEvx',
-    base_url='https://api.chatanywhere.tech/v1',
-    model='gpt-4o-mini'
-)
 chatbot.set_background_message(system_prompt)
+
 llm_ret = chatbot.get_response(f'''
-Search ~ to find files with the {name_pattern} field in their names.
-You may use multithread programming.
-If the time exceeds {timeout} second, stop the search and modify search_max_depth to {depth}.
+    Search ~ to find files with the {name_pattern} field in their names.
+    You may use multithread programming.
+    If the time exceeds {timeout} second, stop the search and modify search_max_depth to {depth}.
 ''')
-print("From LLM, code to be executed:\n  " + llm_ret)
-exec (llm_ret)
+print("------------ code to be executed -----------------")
+print(llm_ret)
+print("--------------------------------------------------")
+
+from utility_find import find
+exec(llm_ret)
 
 # def target_find(_depth):
 #     find(["~"], name = name_pattern, search_depth=_depth)

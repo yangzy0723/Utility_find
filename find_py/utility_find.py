@@ -1,48 +1,21 @@
 import argparse
 import fnmatch
-import inspect
 import logging
 import os
+import sys
 import threading
 
 from typing import Callable, List, Optional
 
+from context import FindContext
+
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 f = open("res.txt", "w")
-find_context = None
-
-def use_output_tool(message: str):
+def out_put(message: str):
     print(message)
     # f.write(message + '\n')
     find_context.has_result = True
-
-class FindContext:
-    def __init__(self, max_depth: int = -1):
-        self.has_result = False
-        self.max_depth = max_depth
-        self.timeout_occurred = False
-
-    def handle_timeout(self, agent_helper: Optional[Callable[[Optional[str]], str]]):
-        self.timeout_occurred = True
-        if not self.has_result:
-            if agent_helper is None:
-                logging.warning('''
-                    Timeout occurred, no result...
-                    No Agent Helper provided.
-                    Skipping!
-                ''')
-                return
-            else:
-                global find_context
-                if len(inspect.signature(agent_helper).parameters) > 0:
-                    prompt = "A timeout event has occurred, please take appropriate action."
-                    agent_ret = agent_helper(prompt)
-                else:
-                    agent_ret = agent_helper()
-                print("From agent, code to be executed:\n  " + agent_ret)
-                exec(agent_ret)
-
 
 def start_timer(timeout_seconds: int, callback: Callable):
     timer = threading.Timer(timeout_seconds, callback)
@@ -65,14 +38,14 @@ def walk_dir(
 
     if not process_dir_first:
         if name_pattern is None or fnmatch.fnmatch(directory, name_pattern):
-            use_output_tool(directory)
+            out_put(directory)
 
     for entry in entries:
         entry_path = os.path.join(directory, entry)
         try:
             if os.path.islink(entry_path) and not follow_symlink_flag:
                 if name_pattern is None or fnmatch.fnmatch(entry, name_pattern):
-                    use_output_tool(entry_path)
+                    out_put(entry_path)
                 continue
 
             if os.path.isdir(entry_path):
@@ -87,18 +60,20 @@ def walk_dir(
                     )
             else:
                 if name_pattern is None or fnmatch.fnmatch(entry, name_pattern):
-                    use_output_tool(entry_path)
+                    out_put(entry_path)
         except (OSError, FileNotFoundError, PermissionError) as e:
             logging.error(f"Error processing {entry_path}: {e}")
 
     if process_dir_first:
         if name_pattern is None or fnmatch.fnmatch(directory, name_pattern):
-            use_output_tool(directory)
+            out_put(directory)
+
+find_context = None
 
 def find(
     folders: List[str],
-    follow_symlink_signal: int = 0,
-    process_dir_first: bool = False,
+    follow_symlink_signal: Optional[int] = 0,
+    process_dir_first: Optional[bool] = False,
     name: Optional[str] = None,
     timeout: Optional[int] = None,
     search_depth: Optional[int] = -1,
@@ -117,8 +92,7 @@ def find(
         timer = start_timer(timeout, lambda: find_context.handle_timeout(agent_helper))
 
     for folder in folders:
-        # expanduser：handle cases like '~'
-        folder = os.path.abspath(os.path.expanduser(folder))
+        folder = os.path.abspath(os.path.expanduser(folder))    # expanduser：handle cases like '~'
 
         if not os.path.exists(folder):
             logging.error(f"Error: The directory {folder} does not exist!")
@@ -129,9 +103,9 @@ def find(
 
         visited.add(folder)
 
-        if os.path.islink(folder) and not follow_symlink_flag:
+        if os.path.islink(folder) and not follow_symlink_signal:
             if name is None or fnmatch.fnmatch(folder, name):
-                use_output_tool(folder)
+                out_put(folder)
             continue
 
         if os.path.isdir(folder):
@@ -145,7 +119,7 @@ def find(
             )
         else:
             if name is None or fnmatch.fnmatch(folder, name):
-                use_output_tool(folder)
+                out_put(folder)
 
     if timeout is not None and timer.is_alive():
         timer.cancel()
@@ -178,7 +152,7 @@ def main():
         follow_symlink_signal=follow_symlink,
         process_dir_first=args.d,
         name=args.name,
-        timeout=1,
+        timeout=1
     )
 
 if __name__ == "__main__":
